@@ -1,0 +1,26 @@
+Battle0 (0.4)
+
+Source code cleanup of battle0-client.c: splitted it up to several files.
+
+-- Stefan Pietzonke <jay-t@gmx.net>  Sun 18 Jan 2015 21:51 +0100
+
+
+Battle0 (0.2)
+
+New: sended data is now in network byte order. See network.c/send_data() / recv_data().
+The last argument is one of BYTEORDER_NET or BYTEORDER_DATA. The BYTEORDER_DATA flag
+does not change the data before sending it. For example sending text string data.
+
+Asks player for server IP if no argument given to client. Android: let player type in 
+server IP. 
+
+Move times for tank now ok.
+
+TODO: 
+- fight system
+- multi player round gameplay with one active player at time. 
+- more units
+- Android: new on screen button theme with symbols
+-
+
+-- Stefan Pietzonke <jay-t@gmx.net>  Wed 10 Dec 2014 16:51 +0100
