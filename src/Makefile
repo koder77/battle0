@@ -3,7 +3,7 @@ CC = gcc
 AR = tar
 GZ = gzip
 
-CFLAGS= -O2
+CFLAGS= -O2 -g
 LDFLAGS = -lSDLmain -lSDL -lSDL_gfx -lSDL_image -lSDL_ttf -lSDL_mixer -lSDL_net -lm
 
 

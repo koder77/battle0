@@ -1,5 +1,7 @@
 #include "global_defs.h"
 
+extern SDL_Joystick *joystick;
+
 Sint16 get_mouse_state (Sint16 *mx, Sint16 *my, Sint16 *button, Uint8 wait_event)
 {
 	SDL_Event event;
@@ -79,17 +81,17 @@ Sint16 get_mouse_state (Sint16 *mx, Sint16 *my, Sint16 *button, Uint8 wait_event
 
 		printf ("get_mouse_state: %i / %i\n", *mx, *my);
 		
-		if (buttonmask & SDL_BUTTON (1))
+		if (buttonmask & SDL_BUTTON (SDL_BUTTON_LEFT))
 		{
 			*button = 1;
 		}
 
-		if (buttonmask & SDL_BUTTON (2))
+		if (buttonmask & SDL_BUTTON (SDL_BUTTON_RIGHT))
 		{
 			*button = 2;
 		}
 
-		if (buttonmask & SDL_BUTTON (3))
+		if (buttonmask & SDL_BUTTON (SDL_BUTTON_MIDDLE))
 		{
 			*button = 3;
 		}
@@ -98,6 +100,17 @@ Sint16 get_mouse_state (Sint16 *mx, Sint16 *my, Sint16 *button, Uint8 wait_event
 	return (0);		/* no error */
 }
 
+Sint16 get_joystick_state (Sint16 *mx, Sint16 *my, Sint16 *button, Sint16 check_button)
+{
+	SDL_PumpEvents ();
+	
+	*mx = SDL_JoystickGetAxis (joystick, 0);
+	*my = SDL_JoystickGetAxis (joystick, 1);
+	
+	*button = SDL_JoystickGetButton (joystick, check_button);
+
+	return (0);
+}
 
 Sint16 get_key_state (Uint8 *key)
 {

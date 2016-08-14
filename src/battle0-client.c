@@ -1,4 +1,4 @@
-// Battle0 - client V 0.4
+// Battle0 - client V 0.7
 
 #include "global_defs.h"
 
@@ -32,6 +32,7 @@ Sint16 screen_width = SCREEN_WIDTH, screen_height = SCREEN_HEIGHT;
 
 /* game map */
 Uint8 world[WORLD_HEIGHT][WORLD_WIDTH];
+Uint32 world_height, world_width;		/* world size, sent by server */
 
 /* upper left corner of game map */
 Sint16 world_up_x = 0, world_up_y = 0, zoom = 1;
@@ -55,6 +56,7 @@ Sint16 move_times_tank[7] =
 };
 
 Sint32 player_number;
+struct player player[MAX_PLAYERS];
 
 /* player wants to know info about unit, stored here: */
 Sint16 unit_info_wx = -1, unit_info_wy = -1;
@@ -72,6 +74,7 @@ SDL_mutex *net_mutex;
 /* screen functions */
 SDL_Surface *screen_copy = NULL;
 
+SDL_Joystick *joystick;			/* global joystick handle */
 
 
 int randint(int n) {
@@ -321,6 +324,15 @@ static int handle_network_init (void *ptr)
 		printf ("this is player: %li\n", player_number);
 	}
 	
+	player[player_number].active = 1;
+	
+	if (recv_data (sd, &player[player_number].hash, sizeof (player[player_number].hash), BYTEORDER_NET) != 0)
+	{
+		exit (EXIT_FAILURE);
+	}
+	
+	printf ("player hash: %li\n\n", player[player_number].hash);
+	
 	SDLNet_TCP_Close (sd);
 	
 	/* get world data from server */
@@ -375,8 +387,47 @@ static int handle_network_init (void *ptr)
 	return (0);
 }
 	
-
-
+void place_start_units (Sint16 zoom)
+{
+	Uint8 tanks[80], tanks_val[80];
+	Sint16 mx, my;
+	Sint16 button = 0;
+	Sint16 worldx, worldy, hud_bottom, max_x, max_y;
+	Sint16 i;
+	Sint16 tanks_to_do = 10;
+	
+	Sint16 hud_x = 30; Sint16 hud_y = (screen_height - TILE_WIDTH * 4) + 5;
+	Sint16 ret;
+	
+	
+	while (tanks_to_do > 0)
+	{
+		/* left colummn */
+		boxRGBA (screen, 0, screen_height - TILE_WIDTH * 4, screen_width - 1, screen_height - 1, 238, 231, 38, 255);
+		snprintf (tanks_val, 80, "%li", tanks_to_do);
+		strcpy (tanks, "tanks to place: ");
+		strcat (tanks, tanks_val);
+		draw_text_ttf (hud_font, tanks, hud_x, hud_y, 0, 0, 0);
+		update_screen ();
+		
+		ret = user_place_tank (zoom);
+		
+		if (ret == 0) 
+		{
+			tanks_to_do--;
+			draw_text_ttf (hud_font, "OK                ", hud_x, hud_y + 30, 0, 0, 0);
+			update_screen ();
+		}
+			
+		if (ret == 2)
+		{
+			draw_text_ttf (hud_font, "unit too far away!", hud_x, hud_y + 30, 255, 0, 0);
+			update_screen ();
+		}
+	}
+}
+	
+	
 int main (int ac, char *av[])
 {
 	const SDL_VideoInfo *info;
@@ -389,6 +440,7 @@ int main (int ac, char *av[])
 	
 	Sint16 screen_reopened;
 	int ret;
+	int net_ok;
 	
 	Uint8 debug[256];
 	
@@ -398,6 +450,12 @@ int main (int ac, char *av[])
 	if (ac >= 2)
 	{
 		strcpy (user_ip, av[1]);
+	}
+	
+	if (ac == 4)
+	{
+		screen_width = atoi (av[2]);
+		screen_height = atoi (av[3]);
 	}
 	
 	ac_g = ac;
@@ -514,13 +572,25 @@ int main (int ac, char *av[])
 	// wait for "q" key	to EXIT
 	SDL_Event event;
 
-	SDL_Joystick *joystick;
-
     SDL_JoystickEventState (SDL_ENABLE);
     joystick = SDL_JoystickOpen (0);
 	
+	net_ok = 0;
+	while (net_ok == 0)
+	{
+		SDL_Delay (50);
+		if (SDL_mutexP (net_mutex) != -1)
+		{
+			if (net == TRUE)
+			{
+				place_start_units (zoom);
+				net_ok = 1;
+			}
+			SDL_mutexV (net_mutex);
+		}
+	}
 	
-	
+
 wait:
 	SDL_Delay (50);
 	if (SDL_mutexP (net_mutex) != -1)
@@ -581,6 +651,10 @@ wait:
 			case SDL_KEYDOWN:
                 switch (event.key.keysym.sym)
                 {
+					case SDLK_b:
+						set_player_home (1, zoom);		/* blue basis */
+						break;
+						
 					case SDLK_d:
 						receive_units ();
 						draw_world (zoom);
@@ -588,6 +662,10 @@ wait:
 					
 					case SDLK_f:
 						user_fire_unit (zoom);
+						break;
+					
+					case SDLK_g:
+						set_player_home (3, zoom);		/* green basis */
 						break;
 						
 					case SDLK_i:
@@ -608,6 +686,10 @@ wait:
                         exit (0);
                         break;
 					
+					 case SDLK_r:
+						 set_player_home (0, zoom);
+						 break;
+						
 					 case SDLK_SPACE:
 						 if (play_token == TRUE)
 						 {
@@ -626,14 +708,16 @@ wait:
 						 }
 						 break;
 						
+					 case SDLK_y:
+						 set_player_home (2, zoom);
+						 break;
+						 
 					 case SDLK_KP_PLUS:
-					 case SDLK_x:
 						 zoom = 2;
 						 draw_world (zoom);
 						 break;
 						 
 					case SDLK_KP_MINUS:
-					case SDLK_y:
 						 zoom = 1;
 						 draw_world (zoom);
 						 break;	 
@@ -661,7 +745,14 @@ wait:
 				break;
 
 			case SDL_MOUSEBUTTONDOWN:
-				user_unit_info (zoom);
+				if (event.button.button == SDL_BUTTON_RIGHT)
+				{
+					user_fire_unit (zoom);
+				}
+				else
+				{
+					user_unit_info (zoom);
+				}
 				break;
 				
 			

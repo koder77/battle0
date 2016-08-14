@@ -1,3 +1,32 @@
+Battle (0.8)
+
+New: world sizes: 128 x 128, 256 x 256, 512 x 512.
+Paths for *.bmp worlds:
+
+/data/gfx/world/
+128/
+256/
+512/
+
+Random worlds can also be created with this sizes!
+
+-- Stefan Pietzonke <jay-t@gmx.net>  Sat 13 Aug 2016 09:20 +0200
+
+Battle (0.7)
+
+New: for random maps the world size can be set (max 512 x 512).
+
+-- Stefan Pietzonke <jay-t@gmx.net>  Tue 26 Apr 2016 21:15 +0200
+
+
+Battle0 (0.5)
+
+New: move path for tank units.
+Set client window size: battle0-client <ip> <width> <height>
+
+-- Stefan Pietzonke <jay-t@gmx.net>  Thu 14 May 2015 20:00 +0200
+
+
 Battle0 (0.4)
 
 Source code cleanup of battle0-client.c: splitted it up to several files.

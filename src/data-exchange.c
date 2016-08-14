@@ -8,16 +8,31 @@ extern TCPsocket sd;		/* Socket descriptor */
 extern Uint8 world[WORLD_HEIGHT][WORLD_WIDTH];
 extern struct unit unit[WORLD_HEIGHT][WORLD_WIDTH];
 
+extern Uint32 world_height;
+extern Uint32 world_width;
+
 extern Uint8 play_token;
+extern struct player player[MAX_PLAYERS];
 
 Sint16 send_world (TCPsocket sock)
 {
 	Sint16 wx, wy, j;
 	Uint8 buf[4];
 	
-	for (wy = 0; wy < WORLD_HEIGHT; wy++)
+	/* send world size */
+	
+	if (send_data (sock, &world_width, sizeof (world_width), BYTEORDER_NET) != 0)
 	{
-		for (wx = 0; wx < WORLD_WIDTH; wx += 4)
+		return (1);
+	}
+	if (send_data (sock, &world_height, sizeof (world_height), BYTEORDER_NET) != 0)
+	{
+		return (1);
+	}
+	
+	for (wy = 0; wy < world_height; wy++)
+	{
+		for (wx = 0; wx < world_width; wx += 4)
 		{
 			for (j = 0; j < 4; j++)
 			{
@@ -41,9 +56,22 @@ Sint16 recv_world (TCPsocket sock)
 	Sint16 wx, wy, j;
 	Uint8 buf[4];
 	
-	for (wy = 0; wy < WORLD_HEIGHT; wy++)
+	printf ("loading world...\n");
+	
+	if (recv_data (sock, &world_width, sizeof (world_width), BYTEORDER_NET) != 0)
 	{
-		for (wx = 0; wx < WORLD_WIDTH; wx += 4)
+		return (1);
+	}
+	if (recv_data (sock, &world_height, sizeof (world_height), BYTEORDER_NET) != 0)
+	{
+		return (1);
+	}
+	
+	printf ("%i x %i\n\n", world_width, world_height);
+	
+	for (wy = 0; wy < world_height; wy++)
+	{
+		for (wx = 0; wx < world_width; wx += 4)
 		{
 			printf ("loading world: %li / %li: ", wx, wy);
 			if (recv_data (sock, buf, sizeof (buf), BYTEORDER_DATA) != 0)
@@ -70,6 +98,7 @@ Sint16 send_unit_tank (TCPsocket sock, Sint16 worldx, Sint16 worldy)
 {
 	Sint32 command, ack;
 	struct tank *tank;
+	Sint16 i;
 	
 	tank = (struct tank *) unit[worldy][worldx].data;
 	
@@ -125,14 +154,17 @@ Sint16 send_unit_tank (TCPsocket sock, Sint16 worldx, Sint16 worldy)
 		return (1);
 	}
 	
-	if (send_data (sock, (Uint8 *) &tank->move_x, sizeof (tank->move_x), BYTEORDER_NET) != 0)
+	for (i = 0; i < MAX_MOVES; i++)
 	{
-		return (1);
-	}
-	
-	if (send_data (sock, (Uint8 *) &tank->move_y, sizeof (tank->move_y), BYTEORDER_NET) != 0)
-	{
-		return (1);
+		if (send_data (sock, (Uint8 *) &tank->move_path[i][0], sizeof (tank->move_path[i][0]), BYTEORDER_NET) != 0)		/* x coord */
+		{
+			return (1);
+		}
+		
+		if (send_data (sock, (Uint8 *) &tank->move_path[i][1], sizeof (tank->move_path[i][1]), BYTEORDER_NET) != 0)		/* y coord */
+		{
+			return (1);
+		}
 	}
 	
 	if (send_data (sock, (Uint8 *) &tank->timer_ready, sizeof (tank->timer_ready), BYTEORDER_NET) != 0)
@@ -192,6 +224,7 @@ Sint16 recv_unit_tank (TCPsocket sock, Sint16 worldx, Sint16 worldy, Sint32 play
 {
 	Sint32 ack;
 	struct tank *tank;
+	Sint16 i;
 	
 	unit[worldy][worldx].data = (struct tank *) malloc (sizeof (struct tank));
 	if (unit[worldy][worldx].data == NULL)
@@ -235,14 +268,17 @@ Sint16 recv_unit_tank (TCPsocket sock, Sint16 worldx, Sint16 worldy, Sint32 play
 		return (1);
 	}
 	
-	if (recv_data (sock, (Uint8 *) &tank->move_x, sizeof (tank->move_x), BYTEORDER_NET) != 0)
+	for (i = 0; i < MAX_MOVES; i++)
 	{
-		return (1);
-	}
+		if (recv_data (sock, (Uint8 *) &tank->move_path[i][0], sizeof (tank->move_path[i][0]), BYTEORDER_NET) != 0)		/* x coord */
+		{
+			return (1);
+		}
 	
-	if (recv_data (sock, (Uint8 *) &tank->move_y, sizeof (tank->move_y), BYTEORDER_NET) != 0)
-	{
-		return (1);
+		if (recv_data (sock, (Uint8 *) &tank->move_path[i][1], sizeof (tank->move_path[i][1]), BYTEORDER_NET) != 0)		/* y coord */
+		{
+			return (1);
+		}
 	}
 	
 	if (recv_data (sock, (Uint8 *) &tank->timer_ready, sizeof (tank->timer_ready), BYTEORDER_NET) != 0)
@@ -300,9 +336,10 @@ Sint16 recv_unit_tank (TCPsocket sock, Sint16 worldx, Sint16 worldy, Sint32 play
 }
 
 /* TANK MOVE */
-Sint16 send_unit_tank_move (TCPsocket sock, Sint16 worldx, Sint16 worldy)
+Sint16 send_unit_tank_move (TCPsocket sock, Sint16 worldx, Sint16 worldy, Sint32 player_number)
 {
 	Sint32 command, ack;
+	Sint16 i;
 	struct tank *tank;
 	
 	tank = (struct tank *) unit[worldy][worldx].data;
@@ -314,10 +351,22 @@ Sint16 send_unit_tank_move (TCPsocket sock, Sint16 worldx, Sint16 worldy)
 		return (1);
 	}
 	
+	if (send_data (sock, (Uint8 *) &player_number, sizeof (player_number), BYTEORDER_NET) != 0)
+	{
+		return (1);
+	}
+	
+	if (send_data (sock, (Uint8 *) &player[player_number].hash, sizeof (player[player_number].hash), BYTEORDER_NET) != 0)
+	{
+		return (1);
+	}
+	
+	/*
 	if (send_data (sock, (Uint8 *) &unit[worldy][worldx].color, sizeof (unit[worldy][worldx].color), BYTEORDER_NET) != 0)
 	{
 		return (1);
 	}
+	*/
 	
 	if (send_data (sock, (Uint8 *) &worldx, sizeof (worldx), BYTEORDER_NET) != 0)
 	{
@@ -329,14 +378,17 @@ Sint16 send_unit_tank_move (TCPsocket sock, Sint16 worldx, Sint16 worldy)
 		return (1);
 	}
 	
-	if (send_data (sock, (Uint8 *) &tank->move_x, sizeof (tank->move_x), BYTEORDER_NET) != 0)
+	for (i = 0; i < MAX_MOVES; i++)
 	{
-		return (1);
-	}
-	
-	if (send_data (sock, (Uint8 *) &tank->move_y, sizeof (tank->move_y), BYTEORDER_NET) != 0)
-	{
-		return (1);
+		if (send_data (sock, (Uint8 *) &tank->move_path[i][0], sizeof (tank->move_path[i][0]), BYTEORDER_NET) != 0)		/* x coord */
+		{
+			return (1);
+		}
+		
+		if (send_data (sock, (Uint8 *) &tank->move_path[i][1], sizeof (tank->move_path[i][1]), BYTEORDER_NET) != 0)		/* y coord */
+		{
+			return (1);
+		}
 	}
 	
 	if (recv_data (sock, (Uint8 *) &ack, sizeof (ack), BYTEORDER_NET) != 0)
@@ -350,14 +402,20 @@ Sint16 send_unit_tank_move (TCPsocket sock, Sint16 worldx, Sint16 worldy)
 Sint16 recv_unit_tank_move (TCPsocket sock)
 {
 	Sint16 worldx, worldy;
-	Sint32 ack, player_number;
+	Sint32 ack, player_number, player_hash;
+	Sint16 i;
 	struct tank *tank;
 	
 	if (recv_data (sock, (Uint8 *) &player_number, sizeof (player_number), BYTEORDER_NET) != 0)
 	{
 		return (1);
 	}
-				
+	
+	if (recv_data (sock, (Uint8 *) &player_hash, sizeof (player_hash), BYTEORDER_NET) != 0)
+	{
+		return (1);
+	}
+	
 	if (recv_data (sock, (Uint8 *) &worldx, sizeof (worldx), BYTEORDER_NET) != 0)
 	{
 		return (1);
@@ -370,6 +428,13 @@ Sint16 recv_unit_tank_move (TCPsocket sock)
 	
 	tank = (struct tank *) unit[worldy][worldx].data;
 	
+	if (player_hash != player[player_number].hash)
+	{
+		/* player number mismatch to unit -> sended data invalid */
+		printf ("PLAYER HASH INVALID!\n");
+		return (1);
+	}
+	
 	if (unit[worldy][worldx].color != player_number)
 	{
 		/* player number mismatch to unit -> sended data invalid */
@@ -377,14 +442,17 @@ Sint16 recv_unit_tank_move (TCPsocket sock)
 		return (1);
 	}
 	
-	if (recv_data (sock, (Uint8 *) &tank->move_x, sizeof (tank->move_x), BYTEORDER_NET) != 0)
+	for (i = 0; i < MAX_MOVES; i++)
 	{
-		return (1);
-	}
+		if (recv_data (sock, (Uint8 *) &tank->move_path[i][0], sizeof (tank->move_path[i][0]), BYTEORDER_NET) != 0)		/* x coord */
+		{
+			return (1);
+		}
 	
-	if (recv_data (sock, (Uint8 *) &tank->move_y, sizeof (tank->move_y), BYTEORDER_NET) != 0)
-	{
-		return (1);
+		if (recv_data (sock, (Uint8 *) &tank->move_path[i][1], sizeof (tank->move_path[i][1]), BYTEORDER_NET) != 0)		/* y coord */
+		{
+			return (1);
+		}
 	}
 	
 	tank->in_move = 0;
@@ -400,7 +468,7 @@ Sint16 recv_unit_tank_move (TCPsocket sock)
 
 
 /* TANK FIRE */
-Sint16 send_unit_tank_fire (TCPsocket sock, Sint16 worldx, Sint16 worldy)
+Sint16 send_unit_tank_fire (TCPsocket sock, Sint16 worldx, Sint16 worldy, Sint32 player_number)
 {
 	Sint32 command, ack;
 	struct tank *tank;
@@ -414,10 +482,22 @@ Sint16 send_unit_tank_fire (TCPsocket sock, Sint16 worldx, Sint16 worldy)
 		return (1);
 	}
 	
+	if (send_data (sock, (Uint8 *) &player_number, sizeof (player_number), BYTEORDER_NET) != 0)
+	{
+		return (1);
+	}
+	
+	if (send_data (sock, (Uint8 *) &player[player_number].hash, sizeof (player[player_number].hash), BYTEORDER_NET) != 0)
+	{
+		return (1);
+	}
+	
+	/*
 	if (send_data (sock, (Uint8 *) &unit[worldy][worldx].color, sizeof (unit[worldy][worldx].color), BYTEORDER_NET) != 0)
 	{
 		return (1);
 	}
+	*/
 	
 	if (send_data (sock, (Uint8 *) &worldx, sizeof (worldx), BYTEORDER_NET) != 0)
 	{
@@ -455,10 +535,15 @@ Sint16 send_unit_tank_fire (TCPsocket sock, Sint16 worldx, Sint16 worldy)
 Sint16 recv_unit_tank_fire (TCPsocket sock)
 {
 	Sint16 worldx, worldy;
-	Sint32 ack, player_number;
+	Sint32 ack, player_number, player_hash;
 	struct tank *tank;
 	
 	if (recv_data (sock, (Uint8 *) &player_number, sizeof (player_number), BYTEORDER_NET) != 0)
+	{
+		return (1);
+	}
+	
+	if (recv_data (sock, (Uint8 *) &player_hash, sizeof (player_hash), BYTEORDER_NET) != 0)
 	{
 		return (1);
 	}
@@ -474,6 +559,13 @@ Sint16 recv_unit_tank_fire (TCPsocket sock)
 	}
 	
 	tank = (struct tank *) unit[worldy][worldx].data;
+	
+	if (player_hash != player[player_number].hash)
+	{
+		/* player number mismatch to unit -> sended data invalid */
+		printf ("PLAYER HASH INVALID!\n");
+		return (1);
+	}
 	
 	if (unit[worldy][worldx].color != player_number)
 	{
@@ -513,9 +605,9 @@ Sint16 send_units (TCPsocket sock)
 	Uint8 buf[4];
 	Sint32 end;
 	
-	for (wy = 0; wy < WORLD_HEIGHT; wy++)
+	for (wy = 0; wy < world_height; wy++)
 	{
-		for (wx = 0; wx < WORLD_WIDTH; wx++)
+		for (wx = 0; wx < world_width; wx++)
 		{
 			if (unit[wy][wx].type != EMPTY)
 			{
@@ -555,9 +647,9 @@ void free_units (void)
 	
 	struct tank *tank;
 	
-	for (wy = 0; wy < WORLD_HEIGHT; wy++)
+	for (wy = 0; wy < world_height; wy++)
 	{
-		for (wx = 0; wx < WORLD_WIDTH; wx++)
+		for (wx = 0; wx < world_width; wx++)
 		{
 			if (unit[wy][wx].type != EMPTY)
 			{

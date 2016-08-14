@@ -23,14 +23,14 @@ There are some SDL libraries needed. See Makefile!
 server
 ------
 
-$ ./battle0-server -random
+$ ./battle0-server -random 128 128
 
-load random world
+load random world 128 x 128 size
 
 
-$ ./battle0 world-island-01.bmp
+$ ./battle0 world-island-01.bmp 512 512
 
-load battle island
+load battle island 512 x 512 size
 
 
 client
@@ -79,5 +79,5 @@ yellow:   bef606    190 246 6
 green:    00ff00    0 255 0
 
 
-The game world picture must be in BMP format 512 x 512 pixels.
+The game world picture must be in BMP format 256 x 256 pixels or 512 x 512 pixels.
 One pixel per field!

@@ -1,4 +1,4 @@
-// Battle0 - server V 0.4
+// Battle0 - server V 0.7
 
 #include "global_defs.h"
 #include "network.h"
@@ -16,6 +16,7 @@ SDL_Surface *world_bmp;
 /* game map */
 Uint8 world[WORLD_HEIGHT][WORLD_WIDTH];
 Sint32 world_seed;
+Uint32 world_height = WORLD_HEIGHT, world_width = WORLD_WIDTH;		/* init world size */
 
 /* units map */
 struct unit unit[WORLD_HEIGHT][WORLD_WIDTH];
@@ -48,20 +49,50 @@ int randint(int n) {
   }
 }
 
+void init_player_hashes ()
+{
+	int p, i, rand;
+	Uint8 *ptr;
+	Sint32 seed;
+
+	/* start random number generator */
+	seed = time (NULL);
+	srand (seed);
+
+	/* set hashes for all 4 players */
+
+	for (p = 0; p < 4; p++)
+	{
+		ptr = (Uint8 *) &player[p].hash;
+
+		for (i = 0; i < 4; i++)
+		{
+			rand = randint (255);
+			*ptr++ = rand;
+		}
+
+		player[p].active = 1;
+		
+		printf ("init_player_hashes: player %i: hash: %li\n", p, player[p].hash);
+	}
+}
+
+
+
 Sint16 load_random_world ()
 {
 	Sint16 wx, wy, i, j, max_base = 5;
 	int random;
-	
+
 	world_seed = time (NULL);
 	srand (world_seed);
-	
-	for (wy = 0; wy < WORLD_HEIGHT; wy++)
+
+	for (wy = 0; wy < world_height; wy++)
 	{
-		for (wx = 0; wx < WORLD_WIDTH; wx++)
+		for (wx = 0; wx < world_width; wx++)
 		{
 			random = randint (15);
-			
+
 			switch (random)
 			{
 				case 0:
@@ -71,11 +102,14 @@ Sint16 load_random_world ()
 				case 4:
 				case 5:
 				case 6:
-				case 7:
-				case 8:
 					world[wy][wx] = GRASS;
 					break;
 					
+				case 7:
+				case 8:
+					world[wy][wx] = DIRT;
+					break;
+
 				case 9:
 				case 10:
 				case 11:
@@ -86,23 +120,23 @@ Sint16 load_random_world ()
 				case 13:
 					world[wy][wx] = MOUNTAIN;
 					break;
-					
+
 				case 14:
 				case 15:
 					world[wy][wx] = WATER;
 					break;
 			}
-					
+
 			unit[wy][wx].type = EMPTY;
 		}
 	}
-	
+
 	/* place bases */
 	wy = 0;
 	for (i = 1; i <= max_base; i++)
 	{
 		wx = 0;
-		
+
 		for (j = 1; j <= max_base; j++)
 		{
 			world[wy][wx] = BASE_RED;
@@ -110,12 +144,12 @@ Sint16 load_random_world ()
 		}
 		wy++;
 	}
-	
+
 	wy = 0;
 	for (i = 1; i <= max_base; i++)
 	{
-		wx = WORLD_WIDTH - max_base - 1;
-		
+		wx = world_width - max_base - 64;
+
 		for (j = 1; j <= max_base; j++)
 		{
 			world[wy][wx] = BASE_BLUE;
@@ -123,12 +157,12 @@ Sint16 load_random_world ()
 		}
 		wy++;
 	}
-	
-	wy = WORLD_HEIGHT - max_base - 1;
+
+	wy = world_height - max_base - 64;
 	for (i = 1; i <= max_base; i++)
 	{
-		wx = WORLD_WIDTH - max_base - 1;
-		
+		wx = world_width - max_base - 64;
+
 		for (j = 1; j <= max_base; j++)
 		{
 			world[wy][wx] = BASE_YELLOW;
@@ -136,12 +170,12 @@ Sint16 load_random_world ()
 		}
 		wy++;
 	}
-	
-	wy = WORLD_HEIGHT - max_base - 1;
+
+	wy = world_height - max_base - 64;
 	for (i = 1; i <= max_base; i++)
 	{
 		wx = 0;
-		
+
 		for (j = 1; j <= max_base; j++)
 		{
 			world[wy][wx] = BASE_GREEN;
@@ -156,10 +190,26 @@ Sint16 load_world_bmp (unsigned char *worldbmp)
 	Sint16 wx, wy;
 	Uint32 pixel;
 	Uint8 r, g, b;
-	
+
 	unsigned char worldname[256];
+
+	strcpy (worldname, "data/gfx/world/");
 	
-	strcpy (worldname, "data/gfx/");
+	if (world_width == 128)
+	{
+		strcat (worldname, "128/");
+	}
+		
+	if (world_width == 256)
+	{
+		strcat (worldname, "256/");
+	}
+	
+	if (world_width == 512)
+	{
+		strcat (worldname, "512/");
+	}
+	
 	strcat (worldname, worldbmp);
 	
 	world_bmp = IMG_Load (worldname);
@@ -168,10 +218,10 @@ Sint16 load_world_bmp (unsigned char *worldbmp)
 		printf ("ERROR: can't load world bmp!\n");
 		return (1);
 	}
-	
-	for (wy = 0; wy < WORLD_HEIGHT; wy++)
+
+	for (wy = 0; wy < world_height; wy++)
 	{
-		for (wx = 0; wx < WORLD_WIDTH; wx++)
+		for (wx = 0; wx < world_width; wx++)
 		{
 			if (SDL_LockSurface (world_bmp) < 0)
             {
@@ -182,77 +232,78 @@ Sint16 load_world_bmp (unsigned char *worldbmp)
             pixel = getpixel (world_bmp, wx, wy);
             SDL_UnlockSurface (world_bmp);
             SDL_GetRGB (pixel, world_bmp->format, &r, &g, &b);
-			
+
 			/* fields */
 			if (r == 215 && g == 220 && b == 35)
 			{
 				world[wy][wx] = DESERT;
 			}
-			
+
 			if (r == 68 && g == 69 && b == 32)
 			{
 				world[wy][wx] = DIRT;
 			}
-	
+
 			if (r == 36 && g == 98 && b == 35)
 			{
 				world[wy][wx] = FORREST;
 			}
-			
+
 			if (r == 34 && g == 220 && b == 33)
 			{
 				world[wy][wx] = GRASS;
 			}
-			
+
 			if (r == 218 && g == 213 && b == 187)
 			{
 				world[wy][wx] = MOUNTAIN;
 			}
-			
+
 			if (r == 255 && g == 255 && b == 255)
 			{
 				world[wy][wx] = SNOW;
 			}
-			
+
 			if (r == 47 && g == 119 && b == 212)
 			{
 				world[wy][wx] = WATER;
 			}
-			
+
 			/* bases */
 			if (r == 255 && g == 0 && b == 0)
 			{
 				world[wy][wx] = BASE_RED;
 			}
-			
+
 			if (r == 00 && g == 0 && b == 255)
 			{
 				world[wy][wx] = BASE_BLUE;
 			}
-			
+
 			if (r == 190 && g == 246 && b == 6)
 			{
 				world[wy][wx] = BASE_YELLOW;
 			}
-			
+
 			if (r == 0 && g == 255 && b == 0)
 			{
 				world[wy][wx] = BASE_GREEN;
 			}
-			
+
 			unit[wy][wx].type = EMPTY;
 		}
 	}
-	
+
 	return (0);
 }
-			
+
 Sint16 set_tank_server (Sint32 color, Sint16 x, Sint16 y)
 {
 	struct tank *tank;
-	
+	Sint16 i;
+
 	printf ("SET TANK: %i / %i\n", x, y);
-	
+
 	unit[y][x].type = TANK;
 	unit[y][x].color = color;
 	unit[y][x].data = (struct tank *) malloc (sizeof (struct tank));
@@ -261,11 +312,11 @@ Sint16 set_tank_server (Sint32 color, Sint16 x, Sint16 y)
 		printf ("ERROR no memory for unit!\n");
 		return (1);
 	}
-	
-	
+
+
 	/* set data */
 	tank = (struct tank *) unit[y][x].data;
-	
+
 	tank->health = 100;
 	tank->aim_angle = 0;
 	tank->aim_x = -1;
@@ -273,8 +324,6 @@ Sint16 set_tank_server (Sint32 color, Sint16 x, Sint16 y)
 	tank->fire = 0;
 	tank->ap = AP_TANK_MAX;
 	tank->max_ap = AP_TANK_MAX;
-	tank->move_x = -1;		/* no move < 0 */
-	tank->move_y = -1;
 	tank->timer_move = 0;
 	tank->in_move = 0;
 	tank->timer_ready = 1;
@@ -284,54 +333,83 @@ Sint16 set_tank_server (Sint32 color, Sint16 x, Sint16 y)
 	tank->motor = 100;
 	tank->cannon = 100;
 	tank->give_up = 0;
-	
+
+	/* init moves */
+
+	for (i = 0; i < MAX_MOVES; i++)
+	{
+		tank->move_path[i][0] = -1;
+		tank->move_path[i][1] = -1;
+	}
+
+	tank->move_field = 0;
+
 	return (0);
 }
-			
+
 Sint16 calculate_data (void)
 {
-	Sint16 wx, wy, j;
+	Sint16 wx, wy, j, i;
+	Sint16 movex, movey;
 	Uint8 buf[4];
 	Sint32 data;
 	int random;
-	
+	int next_player_ok = 0;
+
 	struct tank *tank;
 	struct tank *target_tank;
-	
-	for (wy = 0; wy < WORLD_HEIGHT; wy++)
+
+	for (wy = 0; wy < world_height; wy++)
 	{
-		for (wx = 0; wx < WORLD_WIDTH; wx++)
+		for (wx = 0; wx < world_width; wx++)
 		{
 			if (unit[wy][wx].type != EMPTY)
+			{
+				unit[wy][wx].modify = 1;
+			}
+		}
+	}
+
+
+	for (wy = 0; wy < world_height; wy++)
+	{
+		for (wx = 0; wx < world_width; wx++)
+		{
+			if (unit[wy][wx].type != EMPTY && unit[wy][wx].modify == 1)
 			{
 				switch (unit[wy][wx].type)
 				{
 					case TANK:
 						tank = (struct tank *) unit[wy][wx].data;
-						
-						if (tank->in_move == 0 && tank->move_x > -1 && tank->move_y > -1)
+
+						movex = tank->move_path[tank->move_field][0];
+						movey = tank->move_path[tank->move_field][1];
+
+						unit[wy][wx].modify = 0;
+
+						if (tank->in_move == 0 && movex > -1 && movey > -1)
 						{
-							tank->timer_move = move_times_tank[world[tank->move_y][tank->move_x]];
+							tank->timer_move = move_times_tank[world[movey][movex]];
 							tank->in_move = 1;
 							printf ("tank move timer set to: %li\n", tank->timer_move);
 						}
-						
-						if (tank->move_x > -1 && tank->move_y > -1)
+
+						if (movex > -1 && movey > -1)
 						{
 							printf ("tank move timer: %li\n", tank->timer_move);
 							if (tank->timer_move == 0)
 							{
 								/* move unit to new field */
-								
+
 								printf ("tank moved\n");
-								
-								unit[tank->move_y][tank->move_x].data = (struct tank *) malloc (sizeof (struct tank));
-								if (unit[tank->move_y][tank->move_x].data == NULL)
+
+								unit[movey][movex].data = (struct tank *) malloc (sizeof (struct tank));
+								if (unit[movey][movex].data == NULL)
 								{
 									printf ("ERROR calculate_data no memory for unit!\n");
 									return (1);
 								}
-								
+
 								/*
 								if (memcpy (&unit[tank->move_y][tank->move_y].data, &unit[wy][wx].data, sizeof (struct tank)) == NULL)
 								{
@@ -339,15 +417,31 @@ Sint16 calculate_data (void)
 									return (1);
 								}
 								*/
-								
-								unit[tank->move_y][tank->move_x].data = unit[wy][wx].data;
-								unit[tank->move_y][tank->move_x].type = TANK;
-								unit[tank->move_y][tank->move_x].color = unit[wy][wx].color;
-								
-								tank->move_x = -1; tank->move_y = -1;
-								tank->timer_move = 0;
-								tank->in_move = 0;
-								
+
+								unit[movey][movex].data = unit[wy][wx].data;
+								unit[movey][movex].type = TANK;
+								unit[movey][movex].color = unit[wy][wx].color;
+								unit[movey][movex].modify = 0;
+
+								if ((tank->move_path[tank->move_field + 1][0] == -1 && tank->move_path[tank->move_field + 1][1] == -1) || tank->move_field == MAX_MOVES - 1)
+								{
+									tank->timer_move = 0;
+									tank->in_move = 0;
+									tank->move_field = 0;
+
+									for (i = 0; i < MAX_MOVES; i++)
+									{
+										tank->move_path[i][0] = -1; tank->move_path[i][1] = -1;
+									}
+								}
+								else
+								{
+									if (tank->move_field < MAX_MOVES)
+									{
+										tank->move_field++;
+									}
+								}
+
 								/* set old unit field empty */
 								/* free (unit[wy][wx].data); */
 								unit[wy][wx].type = EMPTY;
@@ -355,10 +449,15 @@ Sint16 calculate_data (void)
 							else
 							{
 								tank->timer_move--;
-							}	
+							}
 						}
-						
-						if (tank->aim_x > -1 && tank->aim_y > -1 && tank->fire == 1)
+
+						if (tank->timer_reload <= TANK_FIRE_RELOAD)
+						{
+							if (tank->timer_reload > 0) tank->timer_reload--;	/* decrease reload timer: zero = loaded */
+						}
+
+						if (tank->aim_x > -1 && tank->aim_y > -1 && tank->fire == 1 && tank->timer_reload == 0)
 						{
 							/* check if fire is possible */
 							if ((tank->aim_x >= wx - TANK_FIRE_RAD && tank->aim_x <= wx + TANK_FIRE_RAD) && (tank->aim_y >= wy - TANK_FIRE_RAD && tank->aim_y <= wy + TANK_FIRE_RAD))
@@ -367,128 +466,276 @@ Sint16 calculate_data (void)
 								{
 									/* fire is possible, calculate damage */
 									target_tank = (struct tank *) unit[tank->aim_y][tank->aim_x].data;
-									
+
 									random = randint (7);
 									switch (random)
 									{
 										case 0:
 											/* hull damage direct hit */
 											target_tank->hull -= ((tank->cannon / 100) + (tank->ccs / 100)) / 2 * 15;
+											if (target_tank->hull < 0) target_tank->hull = 0;
 											break;
-											
+
 										case 1:
 											/* ccs direct hit */
 											target_tank->ccs -= ((tank->cannon / 100) + (tank->ccs / 100)) / 2 * 15;
+											if (target_tank->ccs < 0) target_tank->ccs = 0;
 											break;
-											
+
 										case 2:
 											/* engine direct hit */
 											target_tank->motor -= ((tank->cannon / 100) + (tank->ccs / 100)) / 2 * 15;
+											if (target_tank->motor < 0) target_tank->motor = 0;
 											break;
-											
+
 										case 3:
 											/* cannon direct hit */
 											target_tank->cannon -= ((tank->cannon / 100) + (tank->ccs / 100)) / 2 * 15;
+											if (target_tank->cannon < 0) target_tank->cannon = 0;
 											break;
-											
+
 										default:
 											break;
 									}
-									
+
 									target_tank->health -= ((tank->cannon / 100) + (tank->ccs / 100)) / 2 * 10;
+									if (target_tank->health < 0) target_tank->health = 0;
 									if (random != 0)
 									{
 										target_tank->hull -= ((tank->cannon / 100) + (tank->ccs / 100)) / 2 * 10;
+										if (target_tank->hull < 0) target_tank->hull = 0;
 									}
-									
+
 									tank->fire = 0;		/* reset fire */
-									
+									tank->timer_reload = TANK_FIRE_RELOAD;
+
 									printf ("TANK FIRED\n");
 								}
 							}
 						}
-						
+
 						tank->ap = AP_TANK_MAX;		/* reset APs */
-						
+
 						break;
 				}
 			}
 		}
 	}
-	
+
 	/* set active player */
-	active_player++;
-	if (active_player > player_ind)
-	{
-		active_player = 0;
-	}
 	
+	while (next_player_ok == 0)
+	{
+		active_player++;
+		
+		if (active_player > player_ind)
+		{
+			active_player = 0;
+		}
+		
+		if (player[active_player].active == 1)
+		{
+			next_player_ok = 1;
+			printf ("calculate_data: next player: %i\n", active_player);
+		}
+	}
+		
 	return (0);
 }
+
+Sint16 check_base_captured (Sint16 player_number)
+{
+	Sint16 wx, wy, enemy_units = 0;
+	Sint16 base;
+	
+	switch (player_number)
+	{
+		case 0:
+			/* red */
+			base = BASE_RED;
+			break;
 			
+		case 1:
+			/* blue */
+			base = BASE_BLUE;
+			break;
+			
+		case 2:
+			/* yellow */
+			base = BASE_YELLOW;
+			break;
+			
+		case 3:
+			/* green */
+			base = BASE_GREEN;
+			break;
+	}
+	
+	for (wy = 0; wy < world_height; wy++)
+	{
+		for (wx = 0; wx < world_width; wx++)
+		{
+			if (world[wy][wx] == base)
+			{
+				if (unit[wy][wx].type == TANK)
+				{
+					if (unit[wy][wx].color != player_number)
+					{
+						/* enemy unit on base! */
+						enemy_units++;
+					}
+				}
+			}
+		}
+	}
+	
+	if (enemy_units >= 4)
+	{
+		player[player_number].active = 0;
+		return (1);	/* at least 4 enemy units on base = base captured. Game over for player! */
+	}
+	else
+	{
+		player[player_number].active = 1;
+		return (0);	/* player in game */
+	}
+}
+
 int main (int ac, char *av[])
 {
 	Uint8 buffer[512];
-	Sint32 command, data, player;
+	Sint32 command, data, playernum, playerhash;
 	Sint16 worldx, worldy;
-	
+
 	Sint16 run = 1;
-	
-	printf ("battle0 - server 0.1 running...\n");
-	
+
+	Uint32 hash;
+
+	printf ("battle0 - server 0.7 running...\n");
+
 	if (ac == 2)
 	{
 		if (strcmp (av[1], "-random") == 0)
 		{
 			load_random_world ();
-			printf ("using random map.\n");
+			printf ("using random world.\n");
 		}
 		else
 		{
 			if (load_world_bmp (av[1]) != 0)
 			{
 				printf ("load_world_bmp: ERROR can't load world bmp!\n");
-				exit (1);
+				exit (EXIT_FAILURE);
+			}
+			else
+			{
+				printf ("using .bmp world: %s, size %i x %i.\n", av[1], world_width, world_height);
 			}
 		}
 	}
-	else
+	if (ac == 4)
 	{
-		printf ("battle0-server -random | world-file\n");
+		if (strcmp (av[1], "-random") == 0)
+		{
+			world_width = atoi (av[2]);
+			world_height = atoi (av[3]);
+			
+			if (world_width > WORLD_WIDTH)
+			{
+				printf ("ERROR: world width greater as 512!\n");
+			}
+			if (world_height > WORLD_HEIGHT)
+			{
+				printf ("ERROR: world height greater as 512!\n");
+			}
+		
+			if (world_width > WORLD_WIDTH)
+			{
+				exit (EXIT_FAILURE);
+			}
+			if (world_height > WORLD_HEIGHT)
+			{
+				exit (EXIT_FAILURE);
+			}
+		
+			load_random_world ();
+			printf ("using random world, size %i x %i.\n", world_width, world_height);
+		}
+		else
+		{
+			world_width = atoi (av[2]);
+			world_height = atoi (av[3]);
+			
+			if (world_width > WORLD_WIDTH)
+			{
+				printf ("ERROR: world width greater as 512!\n");
+			}
+			if (world_height > WORLD_HEIGHT)
+			{
+				printf ("ERROR: world height greater as 512!\n");
+			}
+		
+			if (world_width > WORLD_WIDTH)
+			{
+				exit (EXIT_FAILURE);
+			}
+			if (world_height > WORLD_HEIGHT)
+			{
+				exit (EXIT_FAILURE);
+			}
+		
+			if (load_world_bmp (av[1]) != 0)
+			{
+				printf ("load_world_bmp: ERROR can't load world bmp!\n");
+				exit (EXIT_FAILURE);
+			}
+			else
+			{
+				printf ("using .bmp world: %s, size %i x %i.\n", av[1], world_width, world_height);
+			}
+		}
+	}
+	if (ac == 1)
+	{
+		printf ("battle0-server -random | world-file\n\n");
+		printf ("battle0-server -random xsize ysize\n");
+		printf ("battle0-server world-file xsize ysize\n\n"); 
 		exit (1);
 	}
+
+	init_player_hashes ();
 
 	if (SDLNet_Init () < 0)
 	{
 		fprintf (stderr, "SDLNet_Init: %s\n", SDLNet_GetError ());
 		exit (EXIT_FAILURE);
 	}
- 
+
 	/* Resolving the host using NULL make network interface to listen */
 	if (SDLNet_ResolveHost (&ip, NULL, 2010) < 0)
 	{
 		fprintf (stderr, "SDLNet_ResolveHost: %s\n", SDLNet_GetError ());
 		exit (EXIT_FAILURE);
 	}
- 
+
 	/* Open a connection with the IP provided (listen on the host's port) */
 	if (!(sd = SDLNet_TCP_Open (&ip)))
 	{
 		fprintf (stderr, "SDLNet_TCP_Open: %s\n", SDLNet_GetError ());
 		exit (EXIT_FAILURE);
 	}
-	
+
 	while (run)
 	{
 		/* This check the sd if there is a pending connection.
 		* If there is one, accept that, and open a new socket for communicating */
 		SDL_Delay (100);
-		
+
 		if ((csd = SDLNet_TCP_Accept (sd)))
 		{
 			/* Now we can communicate with the client using csd socket
 			* sd will remain opened waiting other connections */
- 
+
 			/* Get the remote address */
 			if ((remoteIP = SDLNet_TCP_GetPeerAddress (csd)))
 			{
@@ -496,10 +743,10 @@ int main (int ac, char *av[])
 				// printf ("Host connected: %x %d\n", SDLNet_Read32 (&remoteIP->host), SDLNet_Read16 (&remoteIP->port));
 			}
 			else
-			{	
+			{
 				// fprintf (stderr, "SDLNet_TCP_GetPeerAddress: %s\n", SDLNet_GetError ());
 			}
-			
+
 			if (recv_data (csd, &command, sizeof (command), BYTEORDER_NET) == 0)
 			{
 				switch (command)
@@ -509,88 +756,111 @@ int main (int ac, char *av[])
 						{
 							player_ind++;
 						}
-						
+
 						data = player_ind;
-						
+
 						if (send_data (csd, &data, sizeof (data), BYTEORDER_NET) != 0)
 						{
 							exit (EXIT_FAILURE);
 						}
-						
+
+						hash = player[player_ind].hash;
+
+						if (send_data (csd, &hash, sizeof (hash), BYTEORDER_NET) != 0)
+						{
+							exit (EXIT_FAILURE);
+						}
+
 						printf ("player: %li requested player number.\n", player_ind);
 						break;
-						
+
 					case GET_WORLD:
 						printf ("get world request...\n");
-						if (recv_data (csd, &player, sizeof (player), BYTEORDER_NET) == 0)
+						if (recv_data (csd, &playernum, sizeof (playernum), BYTEORDER_NET) == 0)
 						{
-							printf ("player: %li requested world data.\n", player);
-							
+							printf ("player: %li requested world data.\n", playernum);
+
 							send_world (csd);
 						}
 						break;
-						
+
 					case SET_UNIT_TANK:
 						printf ("set unit tank request...\n");
-						if (recv_data (csd, &player, sizeof (player), BYTEORDER_NET) == 0)
+						if (recv_data (csd, &playernum, sizeof (playernum), BYTEORDER_NET) == 0)
 						{
 							printf ("player: %li request.\n", player);
 						}
-						
+
+						if (recv_data (csd, &playerhash, sizeof (playerhash), BYTEORDER_NET) == 0)
+						{
+							printf ("player: %li hash.\n", player);
+						}
+
 						if (recv_data (csd, &worldx, sizeof (worldx), BYTEORDER_NET) == 0)
 						{
 							printf ("worldx: %li\n", worldx);
 						}
-							
+
 						if (recv_data (csd, &worldy, sizeof (worldy), BYTEORDER_NET) == 0)
 						{
 							printf ("worldy: %li\n", worldy);
-						}	
-							
-						if (set_tank_server (player, worldx, worldy) == 0)
+						}
+
+						if (playerhash == player[playernum].hash)
 						{
-							data = OK;
+							/* authorized by right hash */
+
+							if (set_tank_server (playernum, worldx, worldy) == 0)
+							{
+								data = OK;
+							}
+							else
+							{
+								data = ERR;
+							}
 						}
 						else
 						{
-							data = ERROR;
+							/* sender was not right player! */
+
+							data = ERR;
 						}
-						
+
 						if (send_data (csd, &data, sizeof (data), BYTEORDER_NET) != 0)
 						{
 							printf ("ERROR sending ACK!\n");
 						}
 						break;
-						
+
 					case RECEIVE_UNITS:
 						if (send_units (csd) != 0)
 						{
 							printf ("ERROR send_units!\n");
 						}
 						break;
-					
+
 					case GET_PLAY_TOKEN:
 						// printf ("get play token request...\n");
-						if (recv_data (csd, &player, sizeof (player), BYTEORDER_NET) == 0)
+						if (recv_data (csd, &playernum, sizeof (playernum), BYTEORDER_NET) == 0)
 						{
 							// printf ("player: %li request.\n", player);
 						}
-						
-						if (player == active_player)
+
+						if ((playernum == active_player) && (player[playernum].active == 1))
 						{
 							data = OK;
 						}
 						else
 						{
-							data = ERROR;
+							data = ERR;
 						}
-						
+
 						if (send_data (csd, &data, sizeof (data), BYTEORDER_NET) != 0)
 						{
 							printf ("ERROR sending ACK!\n");
 						}
 						break;
-						
+
 					case SEND_TANK_MOVE:
 						printf ("tank move...\n");
 						if (recv_unit_tank_move (csd) != 0)
@@ -602,7 +872,7 @@ int main (int ac, char *av[])
 							printf ("tank move OK\n");
 						}
 						break;
-					
+
 					case SEND_TANK_FIRE:
 						printf ("tank fire...\n");
 						if (recv_unit_tank_fire (csd) != 0)
@@ -614,26 +884,42 @@ int main (int ac, char *av[])
 							printf ("tank fire OK\n");
 						}
 						break;
-						
+
 					case USER_MOVE_END:
-						if (recv_data (csd, &player, sizeof (player), BYTEORDER_NET) == 0)
+						if (recv_data (csd, &playernum, sizeof (playernum), BYTEORDER_NET) == 0)
 						{
-							printf ("player: %li request move end.\n", player);
+							printf ("player: %li request move end.\n", playernum);
 						}
-						
-						calculate_data ();	/* dummy call for debugging */
+
+						if (recv_data (csd, &playerhash, sizeof (playerhash), BYTEORDER_NET) == 0)
+						{
+							printf ("player: %li hash.\n", player);
+						}
+
+						if ((playerhash == player[playernum].hash) && (playernum == active_player))
+						{
+							/* authorized by right hash */
+
+	
+							calculate_data ();
+							check_base_captured (playernum);
+							if (send_data (csd, &player[playernum].active, sizeof (player[playernum].active), BYTEORDER_NET) == 0)
+							{
+								printf ("check base captured data sent.\n");
+							}
+								
+						}
 						break;
 				}
-				
+
 			}
 			/* Close the client socket */
 			SDLNet_TCP_Close (csd);
 		}
 	}
-	
+
 	SDLNet_TCP_Close (sd);
 	SDLNet_Quit ();
- 
+
 	return (EXIT_SUCCESS);
 }
-	

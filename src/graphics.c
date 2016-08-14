@@ -28,6 +28,10 @@ extern TTF_Font *hud_font;
 extern Uint8 world[WORLD_HEIGHT][WORLD_WIDTH];
 extern struct unit unit[WORLD_HEIGHT][WORLD_WIDTH];
 extern struct unit_color unit_color[4];
+extern struct player player[MAX_PLAYERS];
+
+extern Uint32 world_height;
+extern Uint32 world_width;
 
 extern Sint16 screen_width;
 extern Sint16 screen_height;
@@ -323,13 +327,26 @@ Sint16 draw_unit_info (Sint16 wx, Sint16 wy, Sint16 zoom)
 	Uint8 ap[80], ap_val[80];
 	
 	Sint16 hud_x = 30; Sint16 hud_y = (screen_height - TILE_WIDTH * 4) + 5;
+	Sint16 i;
 	
 	struct tank *tank;
+	
+	boxRGBA (screen, 0, screen_height - TILE_WIDTH * 4, screen_width - 1, screen_height - 1, 238, 231, 38, 255);
 	
 	if (play_token == TRUE)
 	{
 		/* draw green circle in HUD, it's players turn */
-		filledCircleRGBA (screen, hud_x + 550, hud_y + 20, 10, 24, 184, 31, 255);
+		// filledCircleRGBA (screen, hud_x + 550, hud_y + 20, 10, 24, 184, 31, 255);
+		filledCircleRGBA (screen, screen_width - 40, hud_y + 20, 10, 24, 184, 31, 255);
+	}
+	
+	if (player[player_number].active == 0)
+	{
+		/* GAME OVER for player player_number */
+		
+		filledCircleRGBA (screen, screen_width - 40, hud_y + 20, 10, 24, 255, 0, 0);
+		
+		draw_text_ttf (hud_font, "GAME OVER", screen_width - 120, hud_y + 40, 255, 0, 0);
 	}
 		
 	update_screen ();
@@ -337,12 +354,6 @@ Sint16 draw_unit_info (Sint16 wx, Sint16 wy, Sint16 zoom)
 	if (wx < 0 && wy < 0)
 	{
 		/* undefined, return */
-		return (1);
-	}
-	
-	if (unit[wy][wx].color != player_number)
-	{
-		/* can't show info of enemy tank */
 		return (1);
 	}
 	
@@ -360,49 +371,103 @@ Sint16 draw_unit_info (Sint16 wx, Sint16 wy, Sint16 zoom)
 		snprintf (health_val, 80, "%li", tank->health);
 		strcpy (health, "health: ");
 		strcat (health, health_val);
-		draw_text_ttf (hud_font, health, hud_x, hud_y, 0, 0, 0);
+		
+		if (tank->health > 25)
+		{
+			draw_text_ttf (hud_font, health, hud_x, hud_y, 0, 0, 0);
+		}
+		else
+		{
+			draw_text_ttf (hud_font, health, hud_x, hud_y, 255, 0, 0);	/* red text */
+		}
 		
 		snprintf (hull_val, 80, "%li", tank->hull);
 		strcpy (hull, "hull: ");
 		strcat (hull, hull_val);
-		draw_text_ttf (hud_font, hull, hud_x, hud_y + 20, 0, 0, 0);
+		
+		if (tank->hull > 25)
+		{
+			draw_text_ttf (hud_font, hull, hud_x, hud_y + 20, 0, 0, 0);
+		}
+		else
+		{
+			draw_text_ttf (hud_font, hull, hud_x, hud_y + 20, 255, 0, 0);	/* red text */
+		}
 		
 		snprintf (ccs_val, 80, "%li", tank->ccs);
 		strcpy (ccs, "ccs: ");
 		strcat (ccs, ccs_val);
-		draw_text_ttf (hud_font, ccs, hud_x, hud_y + 40, 0, 0, 0);
+		
+		if (tank->ccs > 25)
+		{
+			draw_text_ttf (hud_font, ccs, hud_x, hud_y + 40, 0, 0, 0);
+		}
+		else
+		{
+			draw_text_ttf (hud_font, ccs, hud_x, hud_y + 40, 255, 0, 0);	/* red text */
+		}
 		
 		/* middle colummn 1*/
 		snprintf (motor_val, 80, "%li", tank->motor);
 		strcpy (motor, "engine: ");
 		strcat (motor, motor_val);
-		draw_text_ttf (hud_font, motor, hud_x + 150, hud_y, 0, 0, 0);
+		
+		if (tank->motor > 25)
+		{
+			draw_text_ttf (hud_font, motor, hud_x + 150, hud_y, 0, 0, 0);
+		}
+		else
+		{
+			draw_text_ttf (hud_font, motor, hud_x + 150, hud_y, 255, 0, 0);	/* red text */
+		}
 		
 		snprintf (cannon_val, 80, "%li", tank->cannon);
 		strcpy (cannon, "cannon: ");
 		strcat (cannon, cannon_val);
-		draw_text_ttf (hud_font, cannon, hud_x + 150, hud_y + 20, 0, 0, 0);
 		
-		/* middle colummn 2 */
-		snprintf (timer_ready_val, 80, "%li", tank->timer_ready);
-		strcpy (timer_ready, "ready in: ");
-		strcat (timer_ready, timer_ready_val);
-		draw_text_ttf (hud_font, timer_ready, hud_x + 300, hud_y, 0, 0, 0);
-		
-		snprintf (timer_reload_val, 80, "%li", tank->timer_reload);
-		strcpy (timer_reload, "reload in: ");
-		strcat (timer_reload, timer_reload_val);
-		draw_text_ttf (hud_font, timer_reload, hud_x + 300, hud_y + 20, 0, 0, 0);
-		
-		/* right colummn */
-		snprintf (ap_val, 80, "%li", tank->ap);
-		strcpy (ap, "AP: ");
-		strcat (ap, ap_val);
-		draw_text_ttf (hud_font, ap, hud_x + 450, hud_y, 0, 0, 0);
-		
-		if (tank->move_x > -1 && tank->move_y > -1)
+		if (tank->cannon > 25)
 		{
-			draw_move_to (screen, tank->move_x, tank->move_y, zoom);
+			draw_text_ttf (hud_font, cannon, hud_x + 150, hud_y + 20, 0, 0, 0);
+		}
+		else
+		{
+			draw_text_ttf (hud_font, cannon, hud_x + 150, hud_y + 20, 255, 0, 0); /* red text */
+		}
+		
+		if (unit[wy][wx].color == player_number)
+		{
+			/* middle colummn 2 */
+			snprintf (timer_ready_val, 80, "%li", tank->timer_ready);
+			strcpy (timer_ready, "ready in: ");
+			strcat (timer_ready, timer_ready_val);
+			draw_text_ttf (hud_font, timer_ready, hud_x + 300, hud_y, 0, 0, 0);
+		
+			snprintf (timer_reload_val, 80, "%li", tank->timer_reload);
+			strcpy (timer_reload, "reload in: ");
+			strcat (timer_reload, timer_reload_val);
+			draw_text_ttf (hud_font, timer_reload, hud_x + 300, hud_y + 20, 0, 0, 0);
+		
+			/* right colummn */
+			snprintf (ap_val, 80, "%li", tank->ap);
+			strcpy (ap, "AP: ");
+			strcat (ap, ap_val);
+			draw_text_ttf (hud_font, ap, hud_x + 450, hud_y, 0, 0, 0);
+		}
+		
+		draw_text_ttf (hud_font, "unit: tank", hud_x + 550, hud_y, 0, 0, 0);		/* show unit type */
+		
+		if (unit[wy][wx].color == player_number)
+		{
+			if (tank->move_path[0][0] > -1 && tank->move_path[0][1] > -1)				/* move path was set, draw fields */
+			{
+				for (i = 0; i < MAX_MOVES; i++)
+				{
+					if (tank->move_path[i][0] > -1 && tank->move_path[i][1] > -1)
+					{
+						draw_move_to (screen, tank->move_path[i][0], tank->move_path[i][1], zoom);
+					}
+				}
+			}
 		}
 	}
 	
@@ -459,9 +524,9 @@ void set_player_home (Sint16 player_number, Sint16 zoom)
 			break;
 	}
 	
-	for (wy = 0; wy < WORLD_HEIGHT; wy++)
+	for (wy = 0; wy < world_height; wy++)
 	{
-		for (wx = 0; wx < WORLD_WIDTH; wx++)
+		for (wx = 0; wx < world_width; wx++)
 		{
 			if (world[wy][wx] == base)
 			{
@@ -470,7 +535,7 @@ void set_player_home (Sint16 player_number, Sint16 zoom)
 		}
 	}
 }
-
+	
 Sint16 draw_world (Sint16 zoom)
 {
 	Sint16 x, y, wx, wy, gtype, hud_bottom;
@@ -489,8 +554,8 @@ Sint16 draw_world (Sint16 zoom)
 	/* check limits */
 	if (world_up_x < 0) world_up_x = 0;
 	if (world_up_y < 0) world_up_y = 0;
-	if (world_up_x > WORLD_WIDTH - 1) world_up_x = WORLD_WIDTH - 1;
-	if (world_up_y > WORLD_HEIGHT - 1) world_up_y = WORLD_HEIGHT - 1;
+	if (world_up_x > world_width - 1) world_up_x = world_width - 1;
+	if (world_up_y > world_height - 1) world_up_y = world_height - 1;
 	
 	if (zoom == 1)
 	{
@@ -504,8 +569,8 @@ Sint16 draw_world (Sint16 zoom)
 	max_x = world_up_x + (screen_width / (TILE_WIDTH * zoom));
 	max_y = world_up_y + (screen_height / (TILE_WIDTH * zoom)) - hud_bottom;
 	
-	if (max_x >= WORLD_WIDTH) max_x = WORLD_WIDTH - 1;
-	if (max_y >= WORLD_HEIGHT) max_y = WORLD_HEIGHT - 1;
+	if (max_x >= world_width) max_x = world_width - 1;
+	if (max_y >= world_height) max_y = world_height - 1;
 	
 	boxRGBA (screen, 0, 0, screen_width - 1, screen_height - 1, 238, 231, 38, 255);
 	SDL_UpdateRect (screen, 0, 0, 0, 0);
